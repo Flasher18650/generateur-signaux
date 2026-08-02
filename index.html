@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Signaux Audio & Électronique</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#0a0e17',
+                            card: '#121824',
+                            border: '#1f293d',
+                            accent: '#00f0ff',
+                            glow: '#00f0ff33'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #0a0e17;
+            color: #e2e8f0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        input[type=range] {
+            accent-color: #00f0ff;
+        }
+        .glow-effect {
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.25);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 md:p-8">
+    <div class="max-w-6xl mx-auto w-full flex-grow flex flex-col gap-6">
+        
+        <!-- Header & Hardware Bandwidth Banner -->
+        <header class="bg-cyber-card border border-cyber-border rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl">
+                    <i class="fa-solid fa-wave-square"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-white tracking-wide">Générateur de Signaux</h1>
+                    <p class="text-xs text-slate-400">Laboratoire de test audio & électronique</p>
+                </div>
+            </div>
+
+            <!-- Hardware Frequency Limit Badge -->
+            <div id="hardwareInfo" class="bg-slate-900/80 border border-slate-700/60 rounded-xl px-4 py-2 flex items-center gap-3">
+                <i class="fa-solid fa-microchip text-cyan-400 text-lg"></i>
+                <div class="text-left">
+                    <div class="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Limite Carte Son (Nyquist)</div>
+                    <div class="text-sm font-mono font-bold text-cyan-300">
+                        <span id="maxFreqDisplay">-- ----</span> Hz
+                        <span class="text-xs font-normal text-slate-400">(@ <span id="sampleRateDisplay">--</span> kHz)</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Controls Sidebar / Panel (5 cols) -->
+            <div class="lg:col-span-5 flex flex-col gap-5">
+                
+                <!-- Main Signal Control Card -->
+                <div class="bg-cyber-card border border-cyber-border rounded-2xl p-6 shadow-xl flex flex-col gap-5">
+                    
+                    <!-- Play / Stop Button -->
+                    <button id="toggleBtn" class="w-full py-4 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-lg transition-all duration-200 flex items-center justify-center gap-3 shadow-lg shadow-cyan-500/20 active:scale-[0.98]">
+                        <i id="toggleIcon" class="fa-solid fa-play"></i>
+                        <span id="toggleText">Démarrer le Signal</span>
+                    </button>
+
+                    <!-- Waveform Dropdown Select -->
+                    <div class="flex flex-col gap-2">
+                        <label for="waveformSelect" class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                            <i class="fa-solid fa-sliders text-cyan-400"></i> Forme d'onde
+                        </label>
+                        <select id="waveformSelect" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-xl p-3 focus:outline-none focus:border-cyan-400 transition-colors cursor-pointer font-medium">
+                            <optgroup label="Signaux Périodiques">
+                                <option value="sine" selected>Signal sinusoïdal</option>
+                                <option value="square">Signal carré</option>
+                                <option value="triangle">Signal triangulaire</option>
+                                <option value="sawtooth">Signal rampe</option>
+                            </optgroup>
+                            <optgroup label="Bruits Électroniques de Mesure">
+                                <option value="random_sh">Bruit Sample & Hold (S&H)</option>
+                                <option value="prbs">Séquence binaire pseudo-aléatoire (PRBS)</option>
+                                <option value="uniform_random">Bruit aléatoire uniforme</option>
+                                <option value="random_walk">Marche aléatoire</option>
+                            </optgroup>
+                        </select>
+                    </div>
+
+                    <!-- Duty Cycle Control (Square Wave Only) -->
+                    <div id="dutyCycleContainer" class="flex flex-col gap-2 bg-slate-900/60 p-4 border border-cyan-500/30 rounded-xl hidden">
+                        <div class="flex justify-between items-center">
+                            <label for="dutyCycleSlider" class="text-xs font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-2">
+                                <i class="fa-solid fa-chart-gantt"></i> Rapport Cyclique
+                            </label>
+                            <span id="dutyCycleValue" class="font-mono text-sm text-cyan-400 font-bold">50 %</span>
+                        </div>
+                        <input type="range" id="dutyCycleSlider" min="1" max="99" value="50" step="1" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                            <span>1% (Impulsion fine)</span>
+                            <span>50% (Symétrique)</span>
+                            <span>99%</span>
+                        </div>
+                    </div>
+
+                    <!-- Frequency Slider -->
+                    <div class="flex flex-col gap-2">
+                        <div class="flex justify-between items-center">
+                            <label for="freqSlider" class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                <i class="fa-solid fa-gauge-high text-cyan-400"></i> Fréquence
+                            </label>
+                            <div class="flex items-center gap-1 font-mono">
+                                <input type="number" id="freqInput" value="440" min="1" max="24000" class="w-24 bg-slate-900 border border-slate-700 text-cyan-400 font-bold text-right px-2 py-1 rounded-lg focus:outline-none focus:border-cyan-400 text-sm">
+                                <span class="text-xs text-slate-400 font-bold ml-1">Hz</span>
+                            </div>
+                        </div>
+                        <input type="range" id="freqSlider" min="1" max="24000" value="440" step="1" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                        <div class="flex justify-between text-[10px] text-slate-500 font-mono">
+                            <span>1 Hz</span>
+                            <span>1 kHz</span>
+                            <span id="maxFreqLabel">24 kHz</span>
+                        </div>
+                    </div>
+
+                    <!-- Volume / Gain Control -->
+                    <div class="flex flex-col gap-2">
+                        <div class="flex justify-between items-center">
+                            <label for="gainSlider" class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                                <i class="fa-solid fa-volume-high text-cyan-400"></i> Amplitude / Gain
+                            </label>
+                            <span id="gainValue" class="font-mono text-sm text-cyan-400 font-bold">50 %</span>
+                        </div>
+                        <input type="range" id="gainSlider" min="0" max="100" value="50" step="1" class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+                    </div>
+
+                </div>
+
+                <!-- Live Measurements Panel -->
+                <div class="bg-cyber-card border border-cyber-border rounded-2xl p-5 shadow-xl flex flex-col gap-3">
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-calculator text-cyan-400"></i> Mesures Théoriques du Signal
+                    </h2>
+                    <div class="grid grid-cols-2 gap-3 text-xs font-mono">
+                        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                            <span class="text-slate-500 block text-[10px]">Période (T)</span>
+                            <span id="periodDisplay" class="text-cyan-300 font-bold text-sm">2.27 ms</span>
+                        </div>
+                        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                            <span class="text-slate-500 block text-[10px]">Tension Crête (Vp)</span>
+                            <span id="vpDisplay" class="text-cyan-300 font-bold text-sm">0.50 V</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="lg:col-span-7 flex flex-col gap-5">
+                
+                <!-- Oscilloscope Canvas Card -->
+                <div class="bg-cyber-card border border-cyber-border rounded-2xl p-5 shadow-xl flex flex-col gap-3">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line"></i> Oscilloscope (Domaine Temporel)
+                        </h2>
+                        <span class="text-[10px] font-mono text-slate-500">Temps Réel</span>
+                    </div>
+                    <div class="relative w-full h-56 bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+                        <canvas id="scopeCanvas" class="w-full h-full block"></canvas>
+                    </div>
+                </div>
+
+                <!-- Spectrum Analyzer Canvas Card -->
+                <div class="bg-cyber-card border border-cyber-border rounded-2xl p-5 shadow-xl flex flex-col gap-3">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-simple"></i> Analyseur de Spectre FFT (Fréquence)
+                        </h2>
+                        <div class="flex items-center gap-2">
+                            <span id="peakFreqDisplay" class="text-[11px] font-mono text-cyan-300 font-bold bg-slate-900/90 px-2.5 py-1 rounded-lg border border-cyan-500/30">Pic: -- Hz</span>
+                            <button id="fftScaleBtn" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-cyan-400 border border-slate-700 hover:border-cyan-500/50 transition-colors">Mode: LOG</button>
+                        </div>
+                    </div>
+                    <div class="relative w-full h-48 bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+                        <canvas id="spectrumCanvas" class="w-full h-full block"></canvas>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let audioCtx = null;
+        let masterGain = null;
+        let analyser = null;
+        let currentSource = null;
+        let isPlaying = false;
+        let isLogScale = true; // Logarithmic frequency scale mode by default
+
+        // Hardware parameters
+        let sampleRate = 48000;
+        let maxNyquistFreq = 24000;
+
+        // Signal Parameters
+        let frequency = 440;
+        let gainValue = 0.5;
+        let dutyCycle = 0.5; // 50%
+        let waveformType = 'sine';
+
+        // UI Element references
+        const toggleBtn = document.getElementById('toggleBtn');
+        const toggleIcon = document.getElementById('toggleIcon');
+        const toggleText = document.getElementById('toggleText');
+        const waveformSelect = document.getElementById('waveformSelect');
+        const dutyCycleContainer = document.getElementById('dutyCycleContainer');
+        const dutyCycleSlider = document.getElementById('dutyCycleSlider');
+        const dutyCycleValue = document.getElementById('dutyCycleValue');
+        const freqSlider = document.getElementById('freqSlider');
+        const freqInput = document.getElementById('freqInput');
+        const gainSlider = document.getElementById('gainSlider');
+        const gainValueDisplay = document.getElementById('gainValue');
+        const maxFreqDisplay = document.getElementById('maxFreqDisplay');
+        const maxFreqLabel = document.getElementById('maxFreqLabel');
+        const sampleRateDisplay = document.getElementById('sampleRateDisplay');
+        const periodDisplay = document.getElementById('periodDisplay');
+        const vpDisplay = document.getElementById('vpDisplay');
+        const peakFreqDisplay = document.getElementById('peakFreqDisplay');
+        const fftScaleBtn = document.getElementById('fftScaleBtn');
+
+        // Canvas element references
+        const scopeCanvas = document.getElementById('scopeCanvas');
+        const scopeCtx = scopeCanvas.getContext('2d');
+        const spectrumCanvas = document.getElementById('spectrumCanvas');
+        const spectrumCtx = spectrumCanvas.getContext('2d');
+
+        function initAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContextClass();
+
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 4096; // Higher resolution FFT
+                analyser.smoothingTimeConstant = 0.8; // Smooth spectrum visual decay
+
+                masterGain = audioCtx.createGain();
+                masterGain.gain.setValueAtTime(gainValue, audioCtx.currentTime);
+
+                masterGain.connect(analyser);
+                analyser.connect(audioCtx.destination);
+
+                // Detect actual hardware sample rate and calculate Nyquist frequency
+                sampleRate = audioCtx.sampleRate;
+                maxNyquistFreq = Math.floor(sampleRate / 2);
+
+                // Update UI elements with detected hardware bounds
+                maxFreqDisplay.textContent = maxNyquistFreq.toLocaleString();
+                maxFreqLabel.textContent = Math.round(maxNyquistFreq / 1000) + ' kHz';
+                sampleRateDisplay.textContent = (sampleRate / 1000).toFixed(1);
+
+                freqSlider.max = maxNyquistFreq;
+                freqInput.max = maxNyquistFreq;
+            }
+
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function createPulseWave(duty) {
+            const nTerms = 128;
+            const real = new Float32Array(nTerms);
+            const imag = new Float32Array(nTerms);
+
+            real[0] = 0;
+            imag[0] = 0;
+
+            for (let n = 1; n < nTerms; n++) {
+                // Fourier series coefficients for pulse wave with duty cycle d
+                real[n] = (2 / (n * Math.PI)) * Math.sin(2 * Math.PI * n * duty);
+                imag[n] = (2 / (n * Math.PI)) * (1 - Math.cos(2 * Math.PI * n * duty));
+            }
+
+            return audioCtx.createPeriodicWave(real, imag);
+        }
+
+        function createElectronicNoiseNode(type) {
+            const bufferSize = audioCtx.sampleRate * 2; // 2 second loop buffer
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+
+            // Calculate step intervals based on target clock frequency
+            const samplesPerStep = Math.max(1, Math.floor(audioCtx.sampleRate / Math.max(1, frequency)));
+
+            if (type === 'random_sh') {
+                // Sample & Hold Random Voltage
+                let currentVal = (Math.random() * 2 - 1);
+                for (let i = 0; i < bufferSize; i++) {
+                    if (i % samplesPerStep === 0) {
+                        currentVal = (Math.random() * 2 - 1);
+                    }
+                    data[i] = currentVal;
+                }
+            } else if (type === 'prbs') {
+                // Pseudo-Random Binary Sequence (PRBS)
+                let currentVal = Math.random() > 0.5 ? 1 : -1;
+                for (let i = 0; i < bufferSize; i++) {
+                    if (i % samplesPerStep === 0) {
+                        currentVal = Math.random() > 0.5 ? 1 : -1;
+                    }
+                    data[i] = currentVal;
+                }
+            } else if (type === 'uniform_random') {
+                // Continuous Uniform Random Noise U[-1, 1]
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+            } else if (type === 'random_walk') {
+                // Random Walk / Brownian Voltage Step
+                let val = 0;
+                for (let i = 0; i < bufferSize; i++) {
+                    if (i % samplesPerStep === 0) {
+                        val += (Math.random() * 2 - 1) * 0.2;
+                        if (val > 1) val = 1;
+                        if (val < -1) val = -1;
+                    }
+                    data[i] = val;
+                }
+            }
+
+            const noiseSource = audioCtx.createBufferSource();
+            noiseSource.buffer = buffer;
+            noiseSource.loop = true;
+            return noiseSource;
+        }
+
+        function updateSignal() {
+            if (!isPlaying || !audioCtx) return;
+
+            // Stop previous source node
+            if (currentSource) {
+                try {
+                    currentSource.stop();
+                    currentSource.disconnect();
+                } catch (e) {}
+            }
+
+            const isElectronicNoise = ['random_sh', 'prbs', 'uniform_random', 'random_walk'].includes(waveformType);
+
+            if (isElectronicNoise) {
+                currentSource = createElectronicNoiseNode(waveformType);
+            } else {
+                const osc = audioCtx.createOscillator();
+                if (waveformType === 'square') {
+                    // Custom pulse wave synthesis for square wave duty cycle
+                    const pulseWave = createPulseWave(dutyCycle);
+                    osc.setPeriodicWave(pulseWave);
+                } else {
+                    osc.type = waveformType;
+                }
+                osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                currentSource = osc;
+            }
+
+            currentSource.connect(masterGain);
+            currentSource.start();
+        }
+
+        function togglePlayback() {
+            initAudioContext();
+
+            if (isPlaying) {
+                if (currentSource) {
+                    try { currentSource.stop(); } catch (e) {}
+                }
+                isPlaying = false;
+                toggleBtn.classList.remove('bg-rose-500', 'hover:bg-rose-400', 'shadow-rose-500/20');
+                toggleBtn.classList.add('bg-cyan-500', 'hover:bg-cyan-400', 'shadow-cyan-500/20');
+                toggleIcon.className = 'fa-solid fa-play';
+                toggleText.textContent = 'Démarrer le Signal';
+            } else {
+                isPlaying = true;
+                updateSignal();
+                toggleBtn.classList.remove('bg-cyan-500', 'hover:bg-cyan-400', 'shadow-cyan-500/20');
+                toggleBtn.classList.add('bg-rose-500', 'hover:bg-rose-400', 'shadow-rose-500/20');
+                toggleIcon.className = 'fa-solid fa-stop';
+                toggleText.textContent = 'Arrêter le Signal';
+            }
+        }
+
+        function updateMeasurements() {
+            const periodMs = (1000 / Math.max(1, frequency)).toFixed(2);
+            periodDisplay.textContent = periodMs + ' ms';
+            vpDisplay.textContent = gainValue.toFixed(2) + ' V';
+        }
+
+        function setFrequency(val) {
+            let clamped = Math.max(1, Math.min(maxNyquistFreq, val));
+            frequency = clamped;
+            freqSlider.value = clamped;
+            freqInput.value = clamped;
+
+            if (isPlaying && currentSource) {
+                const isNoise = ['random_sh', 'prbs', 'uniform_random', 'random_walk'].includes(waveformType);
+                if (isNoise) {
+                    updateSignal();
+                } else if (currentSource.frequency) {
+                    currentSource.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+                }
+            }
+            updateMeasurements();
+        }
+
+        // Attach UI Event Listeners
+        toggleBtn.addEventListener('click', togglePlayback);
+
+        waveformSelect.addEventListener('change', (e) => {
+            waveformType = e.target.value;
+            if (waveformType === 'square') {
+                dutyCycleContainer.classList.remove('hidden');
+            } else {
+                dutyCycleContainer.classList.add('hidden');
+            }
+            updateSignal();
+        });
+
+        dutyCycleSlider.addEventListener('input', (e) => {
+            dutyCycle = parseInt(e.target.value) / 100;
+            dutyCycleValue.textContent = e.target.value + ' %';
+            if (waveformType === 'square') {
+                updateSignal();
+            }
+        });
+
+        freqSlider.addEventListener('input', (e) => setFrequency(parseInt(e.target.value)));
+        freqInput.addEventListener('change', (e) => setFrequency(parseInt(e.target.value)));
+
+        gainSlider.addEventListener('input', (e) => {
+            gainValue = parseInt(e.target.value) / 100;
+            gainValueDisplay.textContent = e.target.value + ' %';
+            if (masterGain && audioCtx) {
+                masterGain.gain.setValueAtTime(gainValue, audioCtx.currentTime);
+            }
+            updateMeasurements();
+        });
+
+        fftScaleBtn.addEventListener('click', () => {
+            isLogScale = !isLogScale;
+            fftScaleBtn.textContent = isLogScale ? 'Mode: LOG' : 'Mode: LIN';
+        });
+
+        function resizeCanvases() {
+            scopeCanvas.width = scopeCanvas.parentElement.clientWidth;
+            scopeCanvas.height = scopeCanvas.parentElement.clientHeight;
+            spectrumCanvas.width = spectrumCanvas.parentElement.clientWidth;
+            spectrumCanvas.height = spectrumCanvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvases);
+        resizeCanvases();
+
+        function drawVisualizers() {
+            requestAnimationFrame(drawVisualizers);
+
+            // Draw Oscilloscope
+            const wScope = scopeCanvas.width;
+            const hScope = scopeCanvas.height;
+            scopeCtx.fillStyle = '#020617';
+            scopeCtx.fillRect(0, 0, wScope, hScope);
+
+            // Grid lines
+            scopeCtx.strokeStyle = '#1e293b';
+            scopeCtx.lineWidth = 1;
+            for (let x = 0; x < wScope; x += 40) {
+                scopeCtx.beginPath();
+                scopeCtx.moveTo(x, 0);
+                scopeCtx.lineTo(x, hScope);
+                scopeCtx.stroke();
+            }
+            for (let y = 0; y < hScope; y += 30) {
+                scopeCtx.beginPath();
+                scopeCtx.moveTo(0, y);
+                scopeCtx.lineTo(wScope, y);
+                scopeCtx.stroke();
+            }
+
+            if (analyser && isPlaying) {
+                const timeBuffer = new Float32Array(analyser.fftSize);
+                analyser.getFloatTimeDomainData(timeBuffer);
+
+                // Auto Trigger / Zero-crossing detection on rising edge
+                let triggerIndex = 0;
+                const threshold = 0.0;
+                for (let i = 0; i < timeBuffer.length - 1; i++) {
+                    if (timeBuffer[i] <= threshold && timeBuffer[i + 1] > threshold) {
+                        triggerIndex = i;
+                        break;
+                    }
+                }
+
+                const displaySamples = Math.min(timeBuffer.length - triggerIndex, 1024);
+
+                scopeCtx.lineWidth = 2;
+                scopeCtx.strokeStyle = '#00f0ff';
+                scopeCtx.beginPath();
+
+                const sliceWidth = wScope / displaySamples;
+                let x = 0;
+
+                for (let i = 0; i < displaySamples; i++) {
+                    const v = timeBuffer[triggerIndex + i];
+                    const y = (v * (hScope / 2.2)) + (hScope / 2);
+
+                    if (i === 0) scopeCtx.moveTo(x, y);
+                    else scopeCtx.lineTo(x, y);
+
+                    x += sliceWidth;
+                }
+                scopeCtx.stroke();
+            } else {
+                // Flat zero line when stopped
+                scopeCtx.strokeStyle = '#334155';
+                scopeCtx.lineWidth = 2;
+                scopeCtx.beginPath();
+                scopeCtx.moveTo(0, hScope / 2);
+                scopeCtx.lineTo(wScope, hScope / 2);
+                scopeCtx.stroke();
+            }
+
+            // Draw Spectrum Analyzer
+            const wSpec = spectrumCanvas.width;
+            const hSpec = spectrumCanvas.height;
+            spectrumCtx.fillStyle = '#020617';
+            spectrumCtx.fillRect(0, 0, wSpec, hSpec);
+
+            if (analyser && isPlaying) {
+                const bufferLength = analyser.frequencyBinCount;
+                const freqBuffer = new Uint8Array(bufferLength);
+                analyser.getByteFrequencyData(freqBuffer);
+
+                const hzPerBin = (sampleRate / 2) / bufferLength;
+                const minHz = 20;
+                const maxHz = maxNyquistFreq;
+
+                // Frequency Grid Ticks & Labels
+                const gridFreqs = isLogScale 
+                    ? [50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000]
+                    : [2000, 5000, 10000, 15000, 20000];
+
+                spectrumCtx.strokeStyle = '#1e293b';
+                spectrumCtx.fillStyle = '#64748b';
+                spectrumCtx.font = '9px monospace';
+                spectrumCtx.lineWidth = 1;
+
+                gridFreqs.forEach(freq => {
+                    if (freq <= maxHz) {
+                        let gx = 0;
+                        if (isLogScale) {
+                            gx = (Math.log10(freq / minHz) / Math.log10(maxHz / minHz)) * wSpec;
+                        } else {
+                            gx = (freq / maxHz) * wSpec;
+                        }
+
+                        if (gx > 0 && gx < wSpec) {
+                            spectrumCtx.beginPath();
+                            spectrumCtx.moveTo(gx, 0);
+                            spectrumCtx.lineTo(gx, hSpec - 15);
+                            spectrumCtx.stroke();
+
+                            const label = freq >= 1000 ? (freq / 1000) + 'k' : freq;
+                            spectrumCtx.fillText(label, gx - 8, hSpec - 4);
+                        }
+                    }
+                });
+
+                // Plot FFT Spectrum Bars across canvas width
+                let maxVal = 0;
+                let maxBinIndex = 0;
+
+                const numPixels = Math.floor(wSpec);
+                for (let x = 0; x < numPixels; x++) {
+                    let freq = 0;
+                    if (isLogScale) {
+                        freq = minHz * Math.pow(maxHz / minHz, x / numPixels);
+                    } else {
+                        freq = (x / numPixels) * maxHz;
+                    }
+
+                    const binIndex = Math.min(bufferLength - 1, Math.floor(freq / hzPerBin));
+                    const value = freqBuffer[binIndex];
+
+                    if (value > maxVal) {
+                        maxVal = value;
+                        maxBinIndex = binIndex;
+                    }
+
+                    const barHeight = (value / 255) * (hSpec - 20);
+                    const y = hSpec - 15 - barHeight;
+
+                    // Draw bar
+                    const gradient = spectrumCtx.createLinearGradient(0, hSpec, 0, 0);
+                    gradient.addColorStop(0, '#00f0ff11');
+                    gradient.addColorStop(0.7, '#00f0ff');
+                    gradient.addColorStop(1, '#f43f5e');
+
+                    spectrumCtx.fillStyle = gradient;
+                    spectrumCtx.fillRect(x, y, 1, barHeight);
+                }
+
+                // Peak Frequency Detection & Marker
+                if (maxVal > 20) {
+                    const peakFreq = Math.round(maxBinIndex * hzPerBin);
+                    peakFreqDisplay.textContent = `Pic: ${peakFreq.toLocaleString()} Hz`;
+
+                    let peakX = 0;
+                    if (isLogScale) {
+                        peakX = (Math.log10(Math.max(minHz, peakFreq) / minHz) / Math.log10(maxHz / minHz)) * wSpec;
+                    } else {
+                        peakX = (peakFreq / maxHz) * wSpec;
+                    }
+
+                    spectrumCtx.strokeStyle = '#f43f5e';
+                    spectrumCtx.lineWidth = 1.5;
+                    spectrumCtx.setLineDash([3, 3]);
+                    spectrumCtx.beginPath();
+                    spectrumCtx.moveTo(peakX, 0);
+                    spectrumCtx.lineTo(peakX, hSpec - 15);
+                    spectrumCtx.stroke();
+                    spectrumCtx.setLineDash([]);
+                } else {
+                    peakFreqDisplay.textContent = 'Pic: -- Hz';
+                }
+
+            } else {
+                peakFreqDisplay.textContent = 'Pic: -- Hz';
+            }
+        }
+
+        // Initialize loops & UI measurements
+        drawVisualizers();
+        updateMeasurements();
+    </script>
+</body>
+</html>
